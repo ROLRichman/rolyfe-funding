@@ -303,14 +303,17 @@ function calculateLoan(){
   } else if(type==="dscr"){
     if(months<=0 || rate<0) return showResult("Check DSCR Inputs",[["Term / rate","Invalid"]],{model:"Amortizing rental-property mortgage",meaning:"Enter a positive term and non-negative rate.",next:"Correct the terms."},"Invalid rate or term.");
     var dscrAmort=amortization(principal,rate,months);
-    var noi=income-expenses,propertyCosts=n("monthlyPropertyCosts"),pitia=dscrAmort.monthly+propertyCosts;
+    var propertyCosts=n("monthlyPropertyCosts"),noi=income-expenses-propertyCosts;
+    var principalInterest=dscrAmort.monthly,pitia=principalInterest+propertyCosts;
+    var rentToPitia=pitia>0?income/pitia:null;
+    var noiCoverage=principalInterest>0?noi/principalInterest:null;
     monthly=pitia;totalInterest=dscrAmort.interest;totalPayback=dscrAmort.total+propertyCosts*months;fees=principal*points/100;
     ltv=collateral>0?principal/collateral*100:null;
-    dscr=pitia>0?noi/pitia:null;cashNeeded=Math.max(0,project-principal)+fees;
-    stats.push(["Gross scheduled monthly rent",money(income)],["Monthly operating expenses",money(expenses)],["Monthly net operating income (NOI)",money(noi)],["Monthly principal + interest",money(dscrAmort.monthly)],["Monthly taxes + insurance + HOA entered",money(propertyCosts)],["Monthly PITIA-style debt service",money(pitia)],["DSCR (NOI ÷ debt service)",dscr===null?"Not available":numberFmt(dscr,2)+"x"],["Loan-to-value (LTV)",ltv===null?"Not available":pct(ltv)],["Annual rate / amortization term",pct(rate)+" · "+months+" months"],["Estimated points / origination fee",money(fees)]);
-    model="Amortizing loan payment plus entered monthly taxes, insurance and HOA; DSCR = NOI ÷ monthly debt service.";
-    meaning="NOI is gross scheduled rent less entered operating expenses. Enter vacancy, management, repairs and other property operating expenses in the expense field. Lender DSCR definitions can differ.";
-    if(noi<0) warning="Net operating income is negative using the entered figures.";
+    dscr=rentToPitia;cashNeeded=Math.max(0,project-principal)+fees;
+    stats.push(["Gross scheduled monthly rent",money(income)],["Monthly operating expenses (excluding taxes/insurance/HOA)",money(expenses)],["Monthly taxes + insurance + HOA",money(propertyCosts)],["Monthly net operating income (NOI)",money(noi)],["Monthly principal + interest",money(principalInterest)],["Monthly PITIA-style debt service",money(pitia)],["Residential rent / PITIA coverage",rentToPitia===null?"Not available":numberFmt(rentToPitia,2)+"x"],["NOI / principal + interest coverage",noiCoverage===null?"Not available":numberFmt(noiCoverage,2)+"x"],["Loan-to-value (LTV)",ltv===null?"Not available":pct(ltv)],["Annual rate / amortization term",pct(rate)+" · "+months+" months"],["Estimated points / origination fee",money(fees)]);
+    model="Amortizing rental mortgage with two explicitly separated coverage methods: gross rent ÷ PITIA for residential investor screening, and NOI ÷ principal-and-interest for commercial-style DSCR comparison.";
+    meaning="NOI subtracts the entered operating expenses and taxes/insurance/HOA. Rent/PITIA is shown separately and uses gross scheduled rent. Lenders define rental DSCR differently; use the lender's specified rent, expense and PITIA method.";
+    if(noi<0) warning="Net operating income is negative after all entered operating costs.";
   } else if(type==="fix_flip"){
     var rehab=n("rehabBudget"),soft=n("softCosts"),projectCost=project+rehab+soft,arv=collateral;
     if(months<=0 || rate<0) return showResult("Check Fix & Flip Inputs",[["Term / rate","Invalid"]],{model:"Interest-only rehab loan",meaning:"Enter a positive term and non-negative rate.",next:"Correct the terms."},"Invalid rate or term.");
@@ -350,7 +353,7 @@ function calculateLoan(){
   if(!stats.length) stats.push(["Calculation","Review entered product inputs"]);
   fundingData={
     type:type,purchase:project,loan:principal,rate:rate,months:months,points:points,income:income,debt:expenses,
-    collateral:collateral,monthly:monthly,fees:fees,totalPayback:totalPayback,totalInterest:totalInterest,
+    collateral:collateral,monthly:monthly,fees:fees,totalPayback:totalPayback,totalInterest:totalInterest,noiDscr:typeof noiCoverage==="number"?noiCoverage:null,
     cashNeeded:cashNeeded,ltv:ltv,dscr:dscr,readiness:"ESTIMATE ONLY — NOT A LENDER DECISION",
     details:stats.map(function(row){return row[0]+": "+row[1];}).join("\n"),
     model:model,meaning:meaning
