@@ -39,7 +39,7 @@ var fieldSchemas = {
     {id:"cdcRate",label:"CDC / SBA Debenture Annual Rate (%)",value:6.5,step:"0.01"},
     {id:"cdcTermMonths",label:"CDC / SBA Debenture Term (months)",value:300,step:"1"}
   ],
-  real_estate_loc: [{id:"creditLimit",label:"Total Approved Credit Limit ($)",value:250000}],
+  real_estate_loc: [{id:"creditLimit",label:"Total Approved Credit Limit ($)",value:250000},{id:"existingLienBalance",label:"Existing Mortgage / Prior Liens ($)",value:0}],
   heloc: [
     {id:"creditLimit",label:"Total HELOC Credit Limit ($)",value:250000},
     {id:"existingLienBalance",label:"Existing Mortgage / Prior Liens ($)",value:0},
@@ -160,7 +160,7 @@ function setLoanDefaults(){
   if(byId("pointsLabel")) byId("pointsLabel").textContent="Estimated Origination / Points % (not program fees)";
   if(byId("monthlyIncomeLabel")) byId("monthlyIncomeLabel").textContent=type==="dscr"?"Monthly Gross Scheduled Rent ($)":"Monthly Gross Business Revenue ($)";
   if(byId("monthlyDebtLabel")){
-    byId("monthlyDebtLabel").textContent=type==="dscr"?"Monthly Property Operating Expenses (excluding debt service) ($)":type==="debt_consolidation"?"Current Combined Monthly Debt Payments ($)":"Monthly Business Operating Expenses (excluding debt service) ($)";
+    byId("monthlyDebtLabel").textContent=type==="dscr"?"Monthly Operating Expenses (excluding taxes/insurance/HOA and debt service) ($)":type==="debt_consolidation"?"Current Combined Monthly Debt Payments ($)":"Monthly Business Operating Expenses (excluding debt service) ($)";
   }
   var useIncome=["business_term","sba_7a","dscr","working_capital","mca","franchise"].includes(type);
   var useExpenses=["business_term","sba_7a","dscr","working_capital","debt_consolidation","franchise"].includes(type);
@@ -273,16 +273,16 @@ function calculateLoan(){
     meaning="Bank and CDC portions use separate rates and terms. Actual project injection, eligible costs, tranche allocation, CDC fees, SBA fees and closing costs must be confirmed with the lender/CDC.";
     other={monthly:monthly,totalInterest:totalInterest,totalPayback:totalPayback,fees:fees,cashNeeded:cashNeeded,bankPrincipal:bankPrincipal,cdcPrincipal:cdcPrincipal};
   } else if(type==="real_estate_loc"){
-    var limit=n("creditLimit")||principal;
+    var limit=n("creditLimit")||principal,priorLocLiens=n("existingLienBalance");
     if(limit<principal) warning="Outstanding draw is greater than the credit limit entered.";
     monthly=principal*rate/100/12;totalInterest=monthly*months;totalPayback=totalInterest+principal;
-    fees=principal*points/100;cashNeeded=Math.max(0,project-principal)+fees;ltv=collateral>0?limit/collateral*100:null;
-    stats.push(["Outstanding draw",money(principal)],["Approved line limit entered",money(limit)],["Unused line availability",money(Math.max(0,limit-principal))],["Monthly interest-only payment",money(monthly)],["Principal due at maturity (balloon)",money(principal)],["Estimated interest over entered term",money(totalInterest)],["Line-limit LTV",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)]);
+    fees=principal*points/100;cashNeeded=Math.max(0,project-principal)+fees;ltv=collateral>0?(limit+priorLocLiens)/collateral*100:null;
+    stats.push(["Outstanding draw",money(principal)],["Approved line limit entered",money(limit)],["Existing mortgage / prior liens",money(priorLocLiens)],["Unused line availability",money(Math.max(0,limit-principal))],["Monthly interest-only payment",money(monthly)],["Principal due at maturity (balloon)",money(principal)],["Estimated interest over entered term",money(totalInterest)],["Combined line exposure LTV",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)]);
     model="Revolving line; interest-only on outstanding draw.";
     meaning="No principal amortization is assumed. The full drawn balance remains due at maturity unless the lender renews, extends or converts the line. Unused credit is not charged interest in this estimate.";
   } else if(type==="heloc"){
     var helocLimit=n("creditLimit")||principal,priorLiens=n("existingLienBalance"),mode=v("repaymentMode");
-    ltv=collateral>0?(principal+priorLiens)/collateral*100:null;
+    ltv=collateral>0?(helocLimit+priorLiens)/collateral*100:null;
     if(helocLimit<principal) warning="Outstanding HELOC draw is greater than the credit limit entered.";
     if(months<=0 || rate<0) return showResult("Check HELOC Inputs",[["Term / rate","Invalid"]],{model:"HELOC draw or repayment phase",meaning:"Enter a positive term and a non-negative rate.",next:"Correct the terms."},"Invalid rate or term.");
     if(mode==="amortizing"){
@@ -303,7 +303,7 @@ function calculateLoan(){
     monthly=pitia;totalInterest=dscrAmort.interest;totalPayback=dscrAmort.total+propertyCosts*months;fees=principal*points/100;
     ltv=collateral>0?principal/collateral*100:null;
     dscr=pitia>0?noi/pitia:null;cashNeeded=Math.max(0,project-principal)+fees;
-    stats.push(["Gross scheduled monthly rent",money(income)],["Monthly operating expenses",money(expenses)],["Monthly net operating income (NOI)",money(noi)],["Monthly principal + interest",money(dscrAmort.monthly)],["Monthly taxes + insurance + HOA entered",money(propertyCosts)],["Monthly PITIA-style debt service",money(pitia)],["DSCR (NOI ÷ debt service)",dscr===null?"Not available":numberFmt(dscr,2)+"x"],["Loan-to-value",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)]);
+    stats.push(["Gross scheduled monthly rent",money(income)],["Monthly operating expenses",money(expenses)],["Monthly net operating income (NOI)",money(noi)],["Monthly principal + interest",money(dscrAmort.monthly)],["Monthly taxes + insurance + HOA entered",money(propertyCosts)],["Monthly PITIA-style debt service",money(pitia)],["DSCR (NOI ÷ debt service)",dscr===null?"Not available":numberFmt(dscr,2)+"x"],["Loan-to-value (LTV)",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)]);
     model="Amortizing loan payment plus entered monthly taxes, insurance and HOA; DSCR = NOI ÷ monthly debt service.";
     meaning="NOI is gross scheduled rent less entered operating expenses. Enter vacancy, management, repairs and other property operating expenses in the expense field. Lender DSCR definitions can differ.";
     if(noi<0) warning="Net operating income is negative using the entered figures.";
@@ -327,7 +327,7 @@ function calculateLoan(){
     var factor=n("factorRate"),holdback=n("holdbackPercent");
     if(factor<1 || holdback<=0 || holdback>100 || income<=0) return showResult("Check MCA Inputs",[["Factor rate",numberFmt(factor,3)],["Holdback / monthly receipts",pct(holdback)],["Monthly gross receipts",money(income)]],{model:"Purchased-future-receivables estimate",meaning:"Factor rate must be at least 1.00, holdback must be above 0% and no more than 100%, and monthly receipts must be positive.",next:"Enter a valid advance, factor rate, holdback percentage and monthly receipts."},"MCA inputs are incomplete or invalid.");
     var payback=principal*factor,cost=payback-principal,monthlyRemit=income*holdback/100,estimatedMonths=payback/monthlyRemit;
-    monthly=monthlyRemit;totalPayback=payback;totalInterest=0;fees=0;cashNeeded=0;
+    monthly=monthlyRemit;totalPayback=payback;totalInterest=0;fees=cost;cashNeeded=0;
     stats.push(["Gross advance",money(principal)],["Factor rate",numberFmt(factor,3)+"x"],["Total purchased amount / payback",money(payback)],["Estimated factor cost",money(cost)],["Estimated monthly remittance at steady receipts",money(monthlyRemit)],["Estimated duration at entered receipts",numberFmt(estimatedMonths,1)+" months"]);
     model="Advance × factor rate; estimated remittance = monthly receipts × holdback percentage.";
     meaning="This is not an APR or amortized-interest calculation. Actual daily/weekly remittances, reconciliation rules, fees, minimums and payoff amount must be checked in the contract.";
@@ -340,7 +340,7 @@ function calculateLoan(){
     model="Invoice face × advance rate; fee = invoice face × fee per 30 days × days outstanding ÷ 30.";
     meaning="Assumes a simple, non-compounding fee and no separate wire, verification, legal, dilution, reserve or recourse charges. Factor contracts can calculate fees differently; use the actual quote.";
   }
-  if(ltv!==null && !stats.some(function(row){return row[0].toLowerCase().includes("ltv");})){
+  if(ltv!==null && !stats.some(function(row){return (row[0].toLowerCase().includes("ltv") || row[0].toLowerCase().includes("ltarv") || row[0].toLowerCase().includes("cltv"));})){
     stats.push(["Collateral LTV",pct(ltv)]);
   }
   if(!stats.length) stats.push(["Calculation","Review entered product inputs"]);
