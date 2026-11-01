@@ -154,10 +154,14 @@ function setLoanDefaults(){
     invoice_factoring:"Advance amount is calculated from invoice face value"
   };
   if(byId("purchaseAmountLabel")) byId("purchaseAmountLabel").textContent=purchaseLabels[type]||"Project / Purchase Amount ($)";
-  if(byId("loanAmountLabel")) byId("loanAmountLabel").textContent=loanLabels[type]||"Requested Loan Principal ($)";
+  if(byId("loanAmountLabel")) byId("loanAmountLabel").textContent=type==="sba_504"?"Financing principal calculated from bank + CDC shares":(loanLabels[type]||"Requested Loan Principal ($)");
   if(byId("interestRateLabel")) byId("interestRateLabel").textContent=type==="sba_504"?"Enter bank and CDC rates in the tranche fields below":"Illustrative Annual Interest Rate % (replace with quote)";
-  if(byId("termMonthsLabel")) byId("termMonthsLabel").textContent="Term in Months (replace with quoted term)";
+  if(byId("termMonthsLabel")) byId("termMonthsLabel").textContent=type==="sba_504"?"Enter separate bank and CDC terms below":type==="mca"?"Not used — repayment duration is estimated from receipts":type==="invoice_factoring"?"Not used — invoice days determine the factor fee":"Term in Months (replace with quoted term)";
   if(byId("pointsLabel")) byId("pointsLabel").textContent="Estimated Origination / Points % (not program fees)";
+  setPairVisible("loanAmount",!calculatedPrincipal);
+  setPairVisible("interestRate",!nonRate);
+  setPairVisible("termMonths",!nonTerm);
+  setPairVisible("points",!noPoints);
   if(byId("monthlyIncomeLabel")) byId("monthlyIncomeLabel").textContent=type==="dscr"?"Monthly Gross Scheduled Rent ($)":"Monthly Gross Business Revenue ($)";
   if(byId("monthlyDebtLabel")){
     byId("monthlyDebtLabel").textContent=type==="dscr"?"Monthly Operating Expenses (excluding taxes/insurance/HOA and debt service) ($)":type==="debt_consolidation"?"Current Combined Monthly Debt Payments ($)":"Monthly Business Operating Expenses (excluding debt service) ($)";
