@@ -15,7 +15,7 @@ var loanDefaults = {
   sba_504: {rate:0,term:0,points:0,explainer:"Two-tranche estimate: separate bank first mortgage and CDC/SBA debenture payments, plus calculated borrower injection. Actual shares, rates, terms and fees depend on the project and CDC/lender."},
   real_estate_loc: {rate:12,term:12,points:2,explainer:"Revolving real-estate line: estimated interest-only payment on the outstanding draw, not on unused availability. Confirm draw period, floor, fees and maturity with the lender."},
   heloc: {rate:9.5,term:120,points:1,explainer:"Home-equity line estimate: choose interest-only draw-period payment or amortizing repayment. Combined LTV includes the existing lien balance you enter."},
-  dscr: {rate:8.25,term:360,points:2,explainer:"Rental-property DSCR: monthly NOI divided by monthly PITIA-style debt service. NOI is rent less operating expenses; debt service includes principal, interest, taxes, insurance and HOA."},
+  dscr: {rate:8.25,term:360,points:2,explainer:"Rental-property screening: shows gross rent ÷ PITIA (a common residential investor-lending method) and NOI ÷ principal-and-interest (a commercial-style method). Use the lender-required definition."},
   fix_flip: {rate:11.5,term:12,points:3,explainer:"Fix-and-flip estimate: interest-only cost on the requested balance, with loan-to-cost and loan-to-ARV screening. Staged draws can change actual interest."},
   bridge: {rate:12,term:12,points:3,explainer:"Bridge loan estimate: interest-only payments with principal due at maturity (balloon). Confirm extension, exit, draw and payoff terms."},
   private_money: {rate:12.5,term:12,points:3,explainer:"Private-money estimate: interest-only payments with principal due at maturity. Actual lender terms and payment frequency control."},
@@ -307,7 +307,7 @@ function calculateLoan(){
     var principalInterest=dscrAmort.monthly,pitia=principalInterest+propertyCosts;
     var rentToPitia=pitia>0?income/pitia:null;
     var noiCoverage=principalInterest>0?noi/principalInterest:null;
-    monthly=pitia;totalInterest=dscrAmort.interest;totalPayback=dscrAmort.total+propertyCosts*months;fees=principal*points/100;
+    monthly=pitia;totalInterest=dscrAmort.interest;totalPayback=dscrAmort.total;fees=principal*points/100;
     ltv=collateral>0?principal/collateral*100:null;
     dscr=rentToPitia;cashNeeded=Math.max(0,project-principal)+fees;
     stats.push(["Gross scheduled monthly rent",money(income)],["Monthly operating expenses (excluding taxes/insurance/HOA)",money(expenses)],["Monthly taxes + insurance + HOA",money(propertyCosts)],["Monthly net operating income (NOI)",money(noi)],["Monthly principal + interest",money(principalInterest)],["Monthly PITIA-style debt service",money(pitia)],["Residential rent / PITIA coverage",rentToPitia===null?"Not available":numberFmt(rentToPitia,2)+"x"],["NOI / principal + interest coverage",noiCoverage===null?"Not available":numberFmt(noiCoverage,2)+"x"],["Loan-to-value (LTV)",ltv===null?"Not available":pct(ltv)],["Annual rate / amortization term",pct(rate)+" · "+months+" months"],["Estimated points / origination fee",money(fees)]);
@@ -343,7 +343,7 @@ function calculateLoan(){
     if(face<=0 || advanceRate<=0 || advanceRate>100 || factorFee<0 || days<=0) return showResult("Check Factoring Inputs",[["Invoice face value",money(face)],["Advance rate",pct(advanceRate)],["Fee per 30 days",pct(factorFee)],["Days outstanding",numberFmt(days,0)]],{model:"Invoice purchase / advance estimate",meaning:"Enter a positive invoice amount, advance rate up to 100%, non-negative fee and positive days outstanding.",next:"Correct the invoice details."},"Invoice factoring inputs are invalid.");
     var advance=face*advanceRate/100,reserve=face-advance,factorCost=face*(factorFee/100)*(days/30),netInvoice=face-factorCost,netUpfront=advance;
     principal=advance;monthly=0;totalInterest=0;totalPayback=netInvoice;fees=factorCost;cashNeeded=0;
-    stats.push(["Invoice face value",money(face)],["Advance rate",pct(advanceRate)],["Fee per 30 days / days outstanding",pct(factorFee)+" · "+days+" days"],["Gross advance at entered rate",money(advance)],["Reserve withheld",money(reserve)],["Estimated factoring fee",money(factorCost)],["Cash advanced upfront (before other fees)",money(netUpfront)],["Estimated total proceeds after factor fee",money(netInvoice)],["Reserve after fee (estimated)",money(Math.max(0,reserve-factorCost))]);
+    stats.push(["Invoice face value",money(face)],["Advance rate",pct(advanceRate)],["Fee per 30 days / days outstanding",pct(factorFee)+" · "+days+" days"],["Gross advance at entered rate",money(advance)],["Reserve withheld",money(reserve)],["Estimated factoring fee",money(factorCost)],["Cash advanced upfront (before other fees)",money(netUpfront)],["Estimated total proceeds after factor fee",money(netInvoice)],["Reserve released after fee / (additional amount due)",money(reserve-factorCost)]);
     model="Invoice face × advance rate; fee = invoice face × fee per 30 days × days outstanding ÷ 30.";
     meaning="Assumes a simple, non-compounding fee and no separate wire, verification, legal, dilution, reserve or recourse charges. Factor contracts can calculate fees differently; use the actual quote.";
   }
@@ -377,7 +377,7 @@ function packageText(){
     "\nEstimated monthly payment / remittance: "+money(fundingData.monthly)+
     "\nEstimated fees / factor fee: "+money(fundingData.fees)+
     "\nEstimated interest: "+money(fundingData.totalInterest)+
-    "\nEstimated total payback: "+money(fundingData.totalPayback)+
+    "\nEstimated total scheduled payback / net proceeds: "+money(fundingData.totalPayback)+
     "\nLTV / leverage: "+(fundingData.ltv===null?"Not applicable":pct(fundingData.ltv))+
     "\nDSCR / cash-flow coverage: "+(fundingData.dscr===null?"Not calculated":numberFmt(fundingData.dscr,2)+"x")+
     "\n\nCalculation detail:\n"+(fundingData.details||"Not calculated")+
