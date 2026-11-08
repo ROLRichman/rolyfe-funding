@@ -1,12 +1,13 @@
 "use strict";
 
 var fundingData = {};
-var leads = JSON.parse(localStorage.getItem("rolyfeFundingLeads") || "[]");
+var leads = [];
 var LINKS = {
   jamal: "https://agent.jotform.com/019bdd1fe57172838101dccf3612b1e9e787",
-  booking: "https://richman-rootoflyfe.zohobookings.com/#/4699692000000050014",
+  booking: "https://richman-rootoflyfe.zohobookings.com/4699692000000050014",
   contract: "https://workdrive.zohoexternal.com/file/6zzgj6f913100497440d1b6166dfc729a61a4",
-  writer: "https://workdrive.zohopublic.com/writer/open/l7x0hdd90d494415d44698cf35f472437b7a1"
+  writer: "https://workdrive.zohopublic.com/writer/open/l7x0hdd90d494415d44698cf35f472437b7a1",
+  fundingIntake: "https://form.jotform.com/252063354378055"
 };
 
 var loanDefaults = {
@@ -391,7 +392,7 @@ function copyFundingPackage(){
   else alert("Clipboard is unavailable in this browser.");
 }
 function emailFundingPackage(){
-  window.open("mailto:richman@rootoflyfe.com?subject=RO’Lyfe Funding Calculation&body="+encodeURIComponent(packageText()),"_blank");
+  saveLead();
 }
 function generateFundingPDF(){
   if(!fundingData.type) calculateLoan();
@@ -418,22 +419,24 @@ function resetCalc(){
   byId("loanResult").innerHTML="<h3>📊 Funding Result</h3><p>Inputs reset. Enter the deal figures and calculate again.</p>";
   fundingData={};
 }
-function openModal(url){byId("modalFrame").src=url;byId("modal").classList.add("active");}
+function openModal(url){byId("modalFrame").src=url;var fallback=byId("modalFallback");if(fallback)fallback.href=url;byId("modal").classList.add("active");}
 function closeModal(){byId("modal").classList.remove("active");byId("modalFrame").src="";}
 function openBookingPopup(){openModal(LINKS.booking);}
 function openDocPopup(type){openModal(type==="writer"?LINKS.writer:LINKS.contract);}
-function openJamalPopup(){window.open(LINKS.jamal+"?embedMode=popup&parentURL="+encodeURIComponent(window.location.href),"Jamal","scrollbars=yes,toolbar=no,width=760,height=620");}
+function openJamalPopup(){if(typeof window.rolyfeOpenUniversalAI==="function"){window.rolyfeOpenUniversalAI();return;}var panel=byId("jamalPanel");if(panel){panel.open=true;panel.scrollIntoView({behavior:"smooth",block:"start"});return;}window.open(LINKS.jamal,"_blank","noopener,noreferrer");}
 function saveLead(){
-  if(!fundingData.type) calculateLoan();
-  var lead={id:Date.now(),client:v("clientName")||"Unnamed Lead",business:v("businessName"),loanType:formatLoanType(fundingData.type||v("loanType")),loan:fundingData.loan||0,readiness:fundingData.readiness||"Estimate only",date:new Date().toLocaleString()};
-  leads.unshift(lead);localStorage.setItem("rolyfeFundingLeads",JSON.stringify(leads));renderLeads();
+  var out=byId("leadPipeline");
+  if(out)out.textContent="Secure Funding Intake opened. Complete the provider form to submit borrower details; this website does not save them in browser storage.";
+  openModal(LINKS.fundingIntake);
 }
-function deleteLead(id){leads=leads.filter(function(item){return item.id!==id;});localStorage.setItem("rolyfeFundingLeads",JSON.stringify(leads));renderLeads();}
+function clearLegacyLeadCache(){
+  if(!confirm("Clear the old RO’Lyfe local lead cache from this device? This removes only the legacy rolyfeFundingLeads browser-storage entry."))return;
+  try{localStorage.removeItem("rolyfeFundingLeads");}catch(error){}
+  var out=byId("leadPipeline");if(out)out.textContent="Legacy local lead cache cleared. New borrower submissions go through secure Funding Intake.";
+}
 function renderLeads(){
   var out=byId("leadPipeline");if(!out)return;
-  out.innerHTML=leads.map(function(lead){
-    return '<div class="pipeline-item"><h3>'+escapeHtml(lead.client)+'</h3><p>'+escapeHtml(lead.business||"")+'<br>'+escapeHtml(lead.loanType)+'<br>Principal / Advance: '+money(lead.loan)+'<br>'+escapeHtml(lead.readiness)+'<br>'+escapeHtml(lead.date)+'</p><button class="red" onclick="deleteLead('+Number(lead.id)+')">Delete</button></div>';
-  }).join("");
+  out.textContent="No borrower details are saved locally. Use Secure Funding Intake for actual submissions.";
 }
 window.addEventListener("load",function(){
   setLoanDefaults();
@@ -455,4 +458,4 @@ window.copyFundingPackage=copyFundingPackage;
 window.emailFundingPackage=emailFundingPackage;
 window.generateFundingPDF=generateFundingPDF;
 window.saveLead=saveLead;
-window.deleteLead=deleteLead;
+window.clearLegacyLeadCache=clearLegacyLeadCache;
