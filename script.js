@@ -4,7 +4,7 @@ var fundingData = {};
 var leads = [];
 var LINKS = {
   jamal: "https://agent.jotform.com/019bdd1fe57172838101dccf3612b1e9e787",
-  booking: "https://richman-rootoflyfe.zohobookings.com/#/4699692000000050014",
+  booking: "https://richman-rootoflyfe.zohobookings.com/4699692000000050014",
   contract: "https://workdrive.zohoexternal.com/file/6zzgj6f913100497440d1b6166dfc729a61a4",
   writer: "https://workdrive.zohopublic.com/writer/open/l7x0hdd90d494415d44698cf35f472437b7a1",
   fundingIntake: "https://form.jotform.com/252063354378055"
