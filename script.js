@@ -86,8 +86,7 @@ function payment(principal,annualRate,months){
   if(principal<=0 || months<=0) return 0;
   var r=annualRate/100/12;
   if(r===0) return principal/months;
-  var pow=Math.pow(1+r,months);
-  return principal*(r*pow)/(pow-1);
+  return principal*r/(-Math.expm1(-months*Math.log1p(r)));
 }
 function amortization(principal,annualRate,months){
   var monthly=payment(principal,annualRate,months);
@@ -125,6 +124,8 @@ function setLoanDefaults(){
   setValue("termMonths",d.term || "");
   setValue("points",d.points);
   renderSpecificFields(type);
+  fundingData={};
+  if(byId("loanResult"))byId("loanResult").innerHTML="<h3>Funding Result</h3><p>Product changed. Review the inputs and calculate again.</p>";
 
   var nonRate=["sba_504","mca","invoice_factoring","credit_repair"].includes(type);
   var nonTerm=["sba_504","mca","invoice_factoring","credit_repair"].includes(type);
@@ -211,7 +212,30 @@ function showResult(title,stats,notes,warning){
   }).join("")+'</div><p><b>Model:</b> '+escapeHtml(notes.model)+'</p><p><b>What this means:</b> '+escapeHtml(notes.meaning)+'</p><p><b>Next step:</b> '+escapeHtml(notes.next)+'</p>'+(warning?'<p class="review"><b>Check:</b> '+escapeHtml(warning)+'</p>':"")+'<p class="small">Screening estimate only. This is not an approval, commitment, appraisal, legal/tax conclusion or guarantee of funding. Confirm lender methodology and actual documents.</p>';
 }
 function calculateLoan(){
+  fundingData={};
   var type=v("loanType");
+  function invalid(message){
+    showResult("Check Inputs",[["Calculation","Not performed"]],{model:"Input validation",meaning:message,next:"Correct the inputs and calculate again."},message);
+    return false;
+  }
+  if(!Object.prototype.hasOwnProperty.call(loanDefaults,type))return invalid("Choose a funding product.");
+  var activeFields=["purchaseAmount","loanAmount","interestRate","termMonths","points","monthlyIncome","monthlyDebt","collateralValue"].concat((fieldSchemas[type]||[]).map(function(f){return f.id;}));
+  var termFields=["termMonths","bankTermMonths","cdcTermMonths","invoiceDays"];
+  var percentageFields=["interestRate","points","bankRate","cdcRate","bankSharePct","cdcSharePct","holdbackPercent","advancePercent","factoringFeePercent"];
+  for(var i=0;i<activeFields.length;i++){
+    var id=activeFields[i],el=byId(id);
+    if(!el||el.hidden||el.disabled||el.tagName==="SELECT")continue;
+    var raw=String(el.value).trim();
+    var val=Number(raw);
+    var label=byId(id+"Label");
+    var name=label?label.textContent:((fieldSchemas[type]||[]).find(function(f){return f.id===id;})||{}).label||id;
+    if(el.validity&&el.validity.badInput)return invalid(name+": enter a valid number.");
+    if(raw===""&&["loanAmount","interestRate","termMonths","bankSharePct","cdcSharePct","bankRate","cdcRate","bankTermMonths","cdcTermMonths","factorRate","holdbackPercent","advancePercent","factoringFeePercent","invoiceDays","creditLimit"].includes(id))return invalid(name+": enter a value.");
+    if(raw==="")continue;
+    if(!Number.isFinite(val)||val<0||val>1e12)return invalid(name+": enter a finite non-negative value no greater than one trillion.");
+    if(termFields.includes(id)&&(!Number.isInteger(val)||val<1||val>1200))return invalid(name+": enter a whole number from 1 to 1,200.");
+    if(percentageFields.includes(id)&&val>100)return invalid(name+": enter a percentage from 0 to 100.");
+  }
   var project=n("purchaseAmount"),requested=n("loanAmount"),rate=n("interestRate"),months=n("termMonths"),points=n("points");
   var income=n("monthlyIncome"),expenses=n("monthlyDebt"),collateral=n("collateralValue");
   var principal=requested,monthly=0,fees=0,totalInterest=0,totalPayback=0,cashNeeded=0,ltv=null,dscr=null,warning="",model="",meaning="",stats=[];
@@ -223,7 +247,7 @@ function calculateLoan(){
     ],{model:"Credit and documentation readiness workflow",meaning:"This pathway is not a credit product or loan offer. No credit score increase, approval or funding result is promised.",next:nextMove(type)},"Do not present this as financing or a loan calculation.");
     return;
   }
-  if(type!=="sba_504" && type!=="invoice_factoring" && (!Number.isFinite(principal)||principal<=0)){
+  if(type!=="sba_504" && type!=="invoice_factoring" && (!Number.isFinite(principal)||principal<0||(principal===0&&!["real_estate_loc","heloc"].includes(type)))){
     showResult("Input Needed",[["Requested amount","Enter an amount above $0"]],{model:"No calculation performed",meaning:"Enter a positive loan or advance amount.",next:"Complete the required inputs and calculate again."},"Loan amount must be greater than zero.");
     return;
   }
@@ -264,7 +288,7 @@ function calculateLoan(){
     other={monthly:monthly,totalInterest:totalInterest,totalPayback:totalPayback,fees:fees,cashNeeded:cashNeeded,dscr:dscr};
   } else if(type==="sba_504"){
     var bankPct=n("bankSharePct"),cdcPct=n("cdcSharePct"),bankRate=n("bankRate"),cdcRate=n("cdcRate"),bankMonths=n("bankTermMonths"),cdcMonths=n("cdcTermMonths");
-    if(project<=0 || bankPct<0 || cdcPct<0 || bankPct+cdcPct>100 || bankMonths<=0 || cdcMonths<=0 || bankRate<0 || cdcRate<0){
+    if(project<=0 || bankPct<0 || cdcPct<0 || bankPct+cdcPct>100 || bankPct+cdcPct<=0 || bankMonths<=0 || cdcMonths<=0 || bankRate<0 || cdcRate<0){
       return showResult("Check SBA 504 Inputs",[["Project cost",money(project)],["Bank + CDC shares",pct(bankPct+cdcPct)]],{model:"Two-tranche amortization",meaning:"Project cost must be positive, share percentages must total no more than 100%, both terms must be positive and rates cannot be negative.",next:"Correct the project cost, tranche shares, rates and terms."},"Shares above 100% or invalid tranche terms. Default shares are illustrative only, not a program rule or lender quote.");
     }
     var bankPrincipal=project*bankPct/100,cdcPrincipal=project*cdcPct/100;
@@ -278,7 +302,8 @@ function calculateLoan(){
     meaning="Bank and CDC portions use separate rates and terms. Actual project injection, eligible costs, tranche allocation, CDC fees, SBA fees and closing costs must be confirmed with the lender/CDC.";
     other={monthly:monthly,totalInterest:totalInterest,totalPayback:totalPayback,fees:fees,cashNeeded:cashNeeded,bankPrincipal:bankPrincipal,cdcPrincipal:cdcPrincipal};
   } else if(type==="real_estate_loc"){
-    var limit=n("creditLimit")||principal,priorLocLiens=n("existingLienBalance");
+    var limit=n("creditLimit"),priorLocLiens=n("existingLienBalance");
+    if(limit<=0||limit<principal)return invalid("Credit limit must be positive and at least the outstanding draw.");
     if(limit<principal) warning="Outstanding draw is greater than the credit limit entered.";
     monthly=principal*rate/100/12;totalInterest=monthly*months;totalPayback=totalInterest+principal;
     fees=principal*points/100;cashNeeded=Math.max(0,project-principal)+fees;ltv=collateral>0?(limit+priorLocLiens)/collateral*100:null;
@@ -286,7 +311,8 @@ function calculateLoan(){
     model="Revolving line; interest-only on outstanding draw.";
     meaning="No principal amortization is assumed. The full drawn balance remains due at maturity unless the lender renews, extends or converts the line. Unused credit is not charged interest in this estimate.";
   } else if(type==="heloc"){
-    var helocLimit=n("creditLimit")||principal,priorLiens=n("existingLienBalance"),mode=v("repaymentMode");
+    var helocLimit=n("creditLimit"),priorLiens=n("existingLienBalance"),mode=v("repaymentMode");
+    if(helocLimit<=0||helocLimit<principal)return invalid("HELOC credit limit must be positive and at least the outstanding draw.");
     ltv=collateral>0?(helocLimit+priorLiens)/collateral*100:null;
     if(helocLimit<principal) warning="Outstanding HELOC draw is greater than the credit limit entered.";
     if(months<=0 || rate<0) return showResult("Check HELOC Inputs",[["Term / rate","Invalid"]],{model:"HELOC draw or repayment phase",meaning:"Enter a positive term and a non-negative rate.",next:"Correct the terms."},"Invalid rate or term.");
@@ -328,7 +354,7 @@ function calculateLoan(){
     if(months<=0 || rate<0) return showResult("Check Loan Inputs",[["Term / rate","Invalid"]],{model:"Interest-only balloon loan",meaning:"Enter a positive term and non-negative rate.",next:"Correct the terms."},"Invalid rate or term.");
     monthly=principal*rate/100/12;totalInterest=monthly*months;totalPayback=principal+totalInterest;fees=principal*points/100;
     ltv=collateral>0?principal/collateral*100:null;cashNeeded=Math.max(0,project-principal)+fees;
-    stats.push(["Monthly interest-only payment",money(monthly)],["Total interest over entered term",money(totalInterest)],["Principal due at maturity (balloon)",money(principal)],["Estimated payoff incl. modeled interest",money(totalPayback)],["Collateral LTV",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)],["Estimated project cash gap + points",money(cashNeeded)],["Annual interest rate / term",pct(rate)+" · "+months+" months"]);
+    stats.push(["Monthly interest-only payment",money(monthly)],["Total interest over entered term",money(totalInterest)],["Principal due at maturity (balloon)",money(principal)],["Total scheduled principal + interest over term",money(totalPayback)],["Collateral LTV",ltv===null?"Not available":pct(ltv)],["Estimated points / origination fee",money(fees)],["Estimated project cash gap + points",money(cashNeeded)],["Annual interest rate / term",pct(rate)+" · "+months+" months"]);
     model="Interest-only monthly payments; full principal due at maturity.";
     meaning="This is a balloon-payment model, not a fully amortizing mortgage. Confirm payment frequency, points, extensions, default rate and exit/refinance conditions.";
   } else if(type==="mca"){
@@ -343,6 +369,8 @@ function calculateLoan(){
     var face=project,advanceRate=n("advancePercent"),factorFee=n("factoringFeePercent"),days=n("invoiceDays");
     if(face<=0 || advanceRate<=0 || advanceRate>100 || factorFee<0 || days<=0) return showResult("Check Factoring Inputs",[["Invoice face value",money(face)],["Advance rate",pct(advanceRate)],["Fee per 30 days",pct(factorFee)],["Days outstanding",numberFmt(days,0)]],{model:"Invoice purchase / advance estimate",meaning:"Enter a positive invoice amount, advance rate up to 100%, non-negative fee and positive days outstanding.",next:"Correct the invoice details."},"Invoice factoring inputs are invalid.");
     var advance=face*advanceRate/100,reserve=face-advance,factorCost=face*(factorFee/100)*(days/30),netInvoice=face-factorCost,netUpfront=advance;
+    if(factorCost>face)return invalid("Estimated factoring fees exceed invoice face value. Verify the fee and duration.");
+    if(factorCost>reserve)warning="Estimated fees exceed the reserve. Additional settlement may be due under the contract.";
     principal=advance;monthly=0;totalInterest=0;totalPayback=netInvoice;fees=factorCost;cashNeeded=0;
     stats.push(["Invoice face value",money(face)],["Advance rate",pct(advanceRate)],["Fee per 30 days / days outstanding",pct(factorFee)+" · "+days+" days"],["Gross advance at entered rate",money(advance)],["Reserve withheld",money(reserve)],["Estimated factoring fee",money(factorCost)],["Cash advanced upfront (before other fees)",money(netUpfront)],["Estimated total proceeds after factor fee",money(netInvoice)],["Reserve released after fee / (additional amount due)",money(reserve-factorCost)]);
     model="Invoice face × advance rate; fee = invoice face × fee per 30 days × days outstanding ÷ 30.";
@@ -366,7 +394,8 @@ function calculateLoan(){
   },warning);
 }
 function packageText(){
-  if(!fundingData.type) calculateLoan();
+  calculateLoan();
+  if(!fundingData.type)return null;
   return "RO’Lyfe Funding Calculation Preview\n\nClient: "+v("clientName")+
     "\nEmail: "+v("clientEmail")+"\nPhone: "+v("clientPhone")+
     "\nBusiness / Entity: "+v("businessName")+"\nProject / Property: "+v("propertyAddress")+
@@ -388,6 +417,7 @@ function packageText(){
 }
 function copyFundingPackage(){
   var content=packageText();
+  if(content===null){alert("Correct the calculation inputs before copying the package.");return;}
   if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(content).then(function(){alert("Funding calculation copied.");}).catch(function(){alert("Clipboard access was blocked. Select and copy the package manually.");});
   else alert("Clipboard is unavailable in this browser.");
 }
@@ -395,13 +425,14 @@ function emailFundingPackage(){
   saveLead();
 }
 function generateFundingPDF(){
-  if(!fundingData.type) calculateLoan();
+  calculateLoan();
+  if(!fundingData.type){alert("Correct the calculation inputs before generating the PDF.");return;}
   if(!window.jspdf || !window.jspdf.jsPDF){alert("PDF library did not load. Use Copy Package instead.");return;}
   var doc=new window.jspdf.jsPDF({unit:"pt",format:"letter"}),y=44;
   function add(text,bold){
     if(y>720){doc.addPage();y=44;}
     doc.setFont("helvetica",bold?"bold":"normal");
-    doc.splitTextToSize(String(text||""),520).forEach(function(line){doc.text(line,40,y);y+=16;});
+    doc.splitTextToSize(String(text||""),520).forEach(function(line){if(y>720){doc.addPage();y=44;doc.setFont("helvetica",bold?"bold":"normal");}doc.text(line,40,y);y+=16;});
   }
   doc.setFontSize(18);add("RO’Lyfe Funding Calculation Preview",true);y+=8;doc.setFontSize(11);
   add("Prepared for internal funding discussion — not a lender decision.");
@@ -439,6 +470,8 @@ function renderLeads(){
   out.textContent="No borrower details are saved locally. Use Secure Funding Intake for actual submissions.";
 }
 window.addEventListener("load",function(){
+  var calc=byId("master-loan-calculator");
+  if(calc)calc.addEventListener("input",function(event){if(event.target.matches("input,select")&&fundingData.type){fundingData={};byId("loanResult").innerHTML="<h3>Funding Result</h3><p>Inputs changed. Calculate again before using the result.</p>";}});
   setLoanDefaults();
   renderLeads();
   setTimeout(function(){
