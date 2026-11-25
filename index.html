@@ -26,7 +26,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 <div class="badge">RO’Lyfe Execution System</div>
 <h1>💰 RO’Lyfe Funding & Link Hub</h1>
 <p>Calculate → Qualify → Package → Book → Submit → Fund</p>
-<div class="hero-actions">
+<p id="rol-header-date" aria-label="Eastern date and time" style="font-size:.85rem;color:#fcd34d"></p><div class="hero-actions"><a class="gold" href="https://my.americasfundingexperts.com/?id=1820217000190862001" target="_blank" rel="noopener noreferrer">Americas Funding Experts ↗</a><a class="blue" href="https://nationalcorporatecredit.com/" target="_blank" rel="noopener noreferrer">National Corporate Credit ↗</a>
 <button onclick="openBookingPopup()">📅 Book Strategy Session</button>
 <button class="blue" onclick="openJamalPopup()">🤖 Ask Jamal</button>
 <a class="gold" href="https://rolrichman.github.io/rolyfe-contract-documents-hub/" target="_blank">📄 Contract Hub</a>
@@ -86,5 +86,5 @@ document.querySelectorAll('main > section').forEach(section=>{const heading=sect
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a)return;const target=document.getElementById(a.getAttribute('href').slice(1));if(target){let p=target;while(p){if(p.tagName==='DETAILS')p.open=true;p=p.parentElement;}}});
 })();
 </script>
-</body>
+<script>(()=>{const el=document.getElementById('rol-header-date');function tick(){const locale=window.ROLyfeLanguage?.locale||'en-US';el.textContent=new Intl.DateTimeFormat(locale,{timeZone:'America/New_York',weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date());}tick();setInterval(tick,15000);window.addEventListener('rol-language-change',tick);})();</script></body>
 </html>
