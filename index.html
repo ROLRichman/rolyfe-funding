@@ -75,5 +75,16 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 <script src="https://cdn.jotfor.ms/s/umd/7c2e87858b6/for-form-embed-handler.js"></script><script>if(window.jotformEmbedHandler){window.jotformEmbedHandler("iframe[id='JotFormIFrame-019bdd1fe57172838101dccf3612b1e9e787']", "https://www.jotform.com");}</script><script src="script.js?v=calc-v5"></script>
 <script src="https://rolrichman.github.io/rolyfe-property-research-intelligence/shared/property-research-dock.js?v=county-zip-20261108"></script><script src="https://rolrichman.github.io/rolyfe-property-research-intelligence/shared/area-intelligence.js?v=county-zip-20261108"></script>
 <script src="https://rolrichman.github.io/rolyfe-personal-trading-desk/shared/rolyfe-global-tools.js?v=20261115-5" defer></script>
+<style>
+#rol-top{position:fixed;bottom:110px;right:18px;z-index:21;width:48px;height:48px;border-radius:50%;padding:0}#rol-top[hidden]{display:none!important}.rol-fold>summary{cursor:pointer;font-weight:700;padding:12px 0;color:inherit}.rol-fold>summary:focus-visible{outline:2px solid #facc15}.rol-fold>summary::marker{color:#10b981}.rol-fold>summary h2{display:inline;font-size:inherit}
+</style>
+<button id="rol-top" type="button" aria-label="Back to top" hidden>↑</button>
+<script>
+(()=>{const top=document.getElementById('rol-top');const sync=()=>{top.hidden=window.scrollY<450};window.addEventListener('scroll',sync,{passive:true});sync();top.addEventListener('click',()=>window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'}));
+const names=/16 Funding Calculators|Funding Package Builder|Embedded Documents|RO.Lyfe Links|RO.Lyfe Introduction/;
+document.querySelectorAll('main > section').forEach(section=>{const heading=section.querySelector(':scope > h2');if(!heading||!names.test(heading.textContent))return;const fold=document.createElement('details');fold.className='rol-fold';const summary=document.createElement('summary');summary.append(heading);fold.append(summary);while(section.firstChild)fold.append(section.firstChild);section.append(fold);});
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#"]');if(!a)return;const target=document.getElementById(a.getAttribute('href').slice(1));if(target){let p=target;while(p){if(p.tagName==='DETAILS')p.open=true;p=p.parentElement;}}});
+})();
+</script>
 </body>
 </html>
