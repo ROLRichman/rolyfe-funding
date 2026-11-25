@@ -370,7 +370,7 @@
     const parent=node.parentElement;
     if(!parent)return true;
     if(parent.closest('script,style,noscript,textarea,input,code,pre,svg,canvas,iframe,video,audio,[data-no-translate],.price,.quote,.symbol,.ticker,.market-price,.quote-value,.quote-cell,.chart,.tradingview-widget-container,#rol-global-tools'))return true;
-    if(parent.closest("#rol-package-private,#rol-broker-docs,#loanResult,#rolpr-saved,#rolyfeUniversalAI"))return true;
+    if(parent.closest("#rol-package-private,#rol-broker-docs,#loanResult,#rolyfeResearchDock,#rolyfeUniversalAI,#rol-source-notice,#rol-share-status,#rol-voice-status"))return true;
     if(parent.tagName==="OPTION"&&!parent.hasAttribute("value"))parent.value=parent.textContent;
     const value=(originalText.get(node)??node.nodeValue??"").trim();
     return value.length<2||!/[A-Za-z\\u00C0-\\u024F\\u0400-\\u04FF\\u0600-\\u06FF\\u4E00-\\u9FFF]/.test(value)||/^(?:[A-Z0-9$%.,:+/\\-]+)$/.test(value);
@@ -378,15 +378,13 @@
   function collectTextNodes(root=document.body){
     const nodes=[];
     if(root?.nodeType===Node.TEXT_NODE){
-      if(!originalText.has(root))originalText.set(root,root.nodeValue);
-      if(!shouldSkipText(root))nodes.push(root);
+      if(!shouldSkipText(root)){if(!originalText.has(root))originalText.set(root,root.nodeValue);nodes.push(root);}
       return nodes;
     }
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     let node;
     while((node=walker.nextNode())){
-      if(!originalText.has(node))originalText.set(node,node.nodeValue);
-      if(!shouldSkipText(node))nodes.push(node);
+      if(!shouldSkipText(node)){if(!originalText.has(node))originalText.set(node,node.nodeValue);nodes.push(node);}
     }
     return nodes;
   }
@@ -399,7 +397,7 @@
     ];
     elements.forEach(el=>{
       if(el.closest('[data-no-translate],script,style,code,pre,svg,canvas,iframe,#rol-global-tools,.chart,.tradingview-widget-container'))return;
-      if(el.closest("#rol-package-private,#rol-broker-docs,#loanResult,#rolpr-saved,#rolyfeUniversalAI"))return;
+      if(el.closest("#rol-package-private,#rol-broker-docs,#loanResult,#rolyfeResearchDock,#rolyfeUniversalAI,#rol-source-notice,#rol-share-status,#rol-voice-status"))return;
       allowed.forEach(attr=>{
         if(!el.hasAttribute(attr))return;
         let saved=originalAttributes.get(el);
@@ -474,7 +472,7 @@
       const translated=await requestTranslationBatch(language,batch);
       translated.forEach((value,j)=>{const k=indices[j];out[k]+=(out[k]?" ":"")+value.trim();});
     }
-    return out;
+    return out.map((value,i)=>(segments[i].match(/^\s*/)||[""])[0]+value+(segments[i].match(/\s*$/)||[""])[0]);
   }
   async function translateEntries(entries,language,isCurrent=()=>true){
     const pending=entries.filter(x=>x.source.trim());
